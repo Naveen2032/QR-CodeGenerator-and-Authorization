@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan QR Code</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f9f9f9;
+            color: #333;
+            transition: background-color 0.5s;
+        }
+        .authorized {
+            background-color: green !important;
+            color: white;
+        }
+        .unauthorized {
+            background-color: red !important;
+            color: white;
+        }
+        .container {
+            margin-top: 50px;
+        }
+        h1 {
+            color: #4CAF50;
+        }
+        #video {
+            width: 100%;
+            max-width: 600px;
+        }
+        #canvas {
+            display: none;
+        }
+        #result {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        #status {
+            margin-top: 10px;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col s12 center-align">
+                <h1>Scan QR Code</h1>
+            </div>
+            <div class="col s12 m8 offset-m2 center-align">
+                <video id="video" class="z-depth-2" autoplay></video>
+                <canvas id="canvas"></canvas>
+                <p id="result" class="flow-text"></p>
+                <p id="status" class="flow-text"></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const result = document.getElementById('result');
+        const status = document.getElementById('status');
+
+        // Function to fetch authorized data from server
+        function fetchAuthorizedData() {
+            return fetch('/fetch_data') // Update endpoint to fetch authorized data
+                .then(response => response.json())
+                .then(data => data.authorizedData)
+                .catch(error => {
+                    console.error('Error fetching authorized data:', error);
+                    return [];
+                });
+        }
+
+        // Start scanning function
+        function startScan() {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(stream => {
+                    video.srcObject = stream;
+                    video.play();
+                    scanQRCode();
+                })
+                .catch(error => {
+                    console.error('Error accessing camera:', error);
+                    result.textContent = 'Error accessing camera. Please check permissions.';
+                });
+        }
+
+        // Function to scan QR code
+        function scanQRCode() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: 'dontInvert',
+                });
+
+                if (code) {
+                    result.textContent = code.data;
+                    checkAuthorization(code.data);
+                }
+            }
+
+            requestAnimationFrame(scanQRCode);
+        }
+
+        // Function to check authorization
+        function checkAuthorization(data) {
+            fetchAuthorizedData()
+                .then(authorizedData => {
+                    if (authorizedData.includes(data)) {
+                        status.textContent = 'Authorized';
+                        document.body.classList.remove('unauthorized');
+                        document.body.classList.add('authorized');
+                    } else {
+                        status.textContent = 'Unauthorized';
+                        document.body.classList.remove('authorized');
+                        document.body.classList.add('unauthorized');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking authorization:', error);
+                    status.textContent = 'Error checking authorization';
+                    document.body.classList.remove('authorized', 'unauthorized');
+                });
+        }
+
+        video.addEventListener('play', scanQRCode);
+
+        // Start scanning immediately when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            startScan();
+        });
+    </script>
+</body>
+</html>

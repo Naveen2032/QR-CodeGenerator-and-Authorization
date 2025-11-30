@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate QR Code</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        .container {
+            margin-top: 50px;
+        }
+        h1 {
+            color: #4CAF50;
+        }
+        .input-field input[type="text"] {
+            border-bottom: 1px solid #4CAF50;
+        }
+        .input-field input[type="text"]:focus {
+            border-bottom: 1px solid #4CAF50;
+            box-shadow: 0 1px 0 0 #4CAF50;
+        }
+        #qrcode {
+            margin-top: 20px;
+        }
+        #message {
+            margin-top: 20px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .btn-custom {
+            background-color: #4CAF50;
+        }
+        .btn-custom:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col s12">
+                <h1 class="center-align">Generate QR Code</h1>
+                <div class="input-field col s12 m8 offset-m2">
+                    <input type="text" id="inputText" name="inputText" class="validate">
+                    <label for="inputText">Enter text to generate QR code</label>
+                </div>
+                <div class="col s12">
+                    <div class="center-align">
+                        <button class="btn waves-effect waves-light btn-custom" onclick="generateQRCode()">Generate QR Code</button>
+                        <button class="btn waves-effect waves-light btn-custom" onclick="downloadQRCode()">Download QR Code</button>
+                        <button class="btn waves-effect waves-light btn-custom" onclick="location.href='/scan'">Scan QR Code</button>
+                    </div>
+                </div>
+                <div class="col s12 center-align" id="qrcode">
+                    <canvas id="qr-canvas" width="200" height="200"></canvas>
+                </div>
+                <div class="col s12 center-align" id="message"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            M.AutoInit();
+        });
+
+        function generateQRCode() {
+            const inputText = document.getElementById('inputText').value;
+            if (!inputText) {
+                M.toast({html: 'Please enter text to generate QR code.', classes: 'rounded'});
+                return;
+            }
+
+            fetch('/generate_qr', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text: inputText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const qrCanvas = document.getElementById('qr-canvas');
+                const qrMessage = document.getElementById('message');
+                qrMessage.textContent = `QR Code generated for: ${data.text}`;
+
+                const img = new Image();
+                img.onload = function() {
+                    qrCanvas.getContext('2d').drawImage(img, 0, 0);
+                };
+                img.src = `static/myQRCode.png?${new Date().getTime()}`;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+
+        function downloadQRCode() {
+            fetch('/download_qr')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to download QR code image');
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'myQRCode.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+    </script>
+</body>
+</html>
